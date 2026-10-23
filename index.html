@@ -1,0 +1,1126 @@
+<title>MediBot 3D Twin</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: 3D hospital (left) and the Group 3 state flow diagram (right). Group colors mirror the original diagram. */
+:root{
+  --bg:#e9eef1; --surface:#ffffff; --ink:#15222a; --muted:#566872; --line:#cfd9df; --accent:#0b7480;
+  --main:#3466cf; --nav:#258a4f; --decide:#b5860a; --err:#cc3d36;
+  --main-soft:#e6edfb; --nav-soft:#e3f3e9; --decide-soft:#fbf2d9; --err-soft:#fbe6e4; --frame:#f3f6f8;
+  --box-lab:#2f9e5b; --box-rad:#3466cf; --box-ward:#d9a514; --box-er:#d64541;
+  --font-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1418; --surface:#162027; --ink:#e3ebee; --muted:#93a6af; --line:#2a3842; --accent:#3cb4bf;
+  --main:#6e98f0; --nav:#4cc27f; --decide:#e1b13a; --err:#f0716a;
+  --main-soft:#1b2842; --nav-soft:#163023; --decide-soft:#382d12; --err-soft:#3b1d1c; --frame:#121b21;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1418; --surface:#162027; --ink:#e3ebee; --muted:#93a6af; --line:#2a3842; --accent:#3cb4bf;
+  --main:#6e98f0; --nav:#4cc27f; --decide:#e1b13a; --err:#f0716a;
+  --main-soft:#1b2842; --nav-soft:#163023; --decide-soft:#382d12; --err-soft:#3b1d1c; --frame:#121b21;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 32px}
+.wrap{max-width:1640px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;justify-content:space-between}
+h1{font-size:1.4rem;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1 small{display:block;font-size:.8rem;font-weight:400;color:var(--muted)}
+.controls,.row{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+button,select{font:inherit;font-size:.86rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:6px 11px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.danger{border-color:var(--err);color:var(--err);font-weight:700}
+button.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+button.boxbtn{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+button.boxbtn i{display:inline-block;width:12px;height:12px;border-radius:2px}
+label.inline{display:inline-flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;min-width:0}
+.eyebrow{font-family:var(--font-mono);font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0}
+.main{display:grid;grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);gap:12px;align-items:stretch}
+@media (max-width:1100px){.main{grid-template-columns:minmax(0,1fr)}}
+#view{position:relative;height:clamp(340px,58vh,620px);border-radius:6px;overflow:hidden;background:#dfe7eb}
+@media (max-width:700px){#view{height:80vw;min-height:270px}}
+#view canvas{display:block;width:100%;height:100%;touch-action:none}
+.hint{position:absolute;left:10px;bottom:10px;font-size:.78rem;color:#2a3a43;background:rgba(255,255,255,.85);border-radius:5px;padding:5px 9px;pointer-events:none;max-width:calc(100% - 20px)}
+.camrow{position:absolute;top:10px;right:10px;display:flex;gap:6px}
+.camrow button{background:rgba(255,255,255,.9);color:#15222a;border-color:#c5d0d6;font-size:.78rem;padding:4px 9px}
+.camrow button.on{background:#15222a;color:#fff}
+/* robot's mind: fixed box above the 3D view, avatar + current thought */
+.mind{display:flex;align-items:center;gap:10px;height:3.6rem;margin-bottom:8px;padding:6px 10px;border:2px solid #0b7480;border-radius:10px;background:#f4fbfc;transition:border-color .2s,background .2s}
+.mind.alert{border-color:#cc3d36;background:#fdf3f2}.mind.happy{border-color:#258a4f;background:#f1faf4}
+.mind svg{flex:0 0 auto;width:40px;height:40px}
+.mind .txt{flex:1;min-width:0;font-weight:700;font-size:.92rem;line-height:1.3;color:#15222a;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+@media (max-width:700px){.mind{height:3.2rem;gap:8px}.mind svg{width:34px;height:34px}.mind .txt{font-size:.82rem}}
+.batt{position:absolute;top:10px;left:10px;display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:.74rem;color:#15222a;background:rgba(255,255,255,.9);border-radius:5px;padding:4px 8px}
+.batt .bar{width:64px;height:7px;border-radius:4px;background:#c9d3d8;overflow:hidden}
+.batt .fill{display:block;height:100%;width:100%;background:#258a4f}
+@media (max-width:700px){.batt .lbl{display:none}.batt .bar{width:44px}.camrow button{font-size:.72rem;padding:3px 7px}}
+.controlsrow{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+/* fixed-height status box so the diagram below never shifts */
+.now{display:flex;flex-direction:column;justify-content:center;gap:2px;height:4.9rem;overflow:hidden;border:1px solid var(--line);border-left:5px solid var(--main);border-radius:6px;padding:6px 12px;margin-bottom:10px;background:var(--frame)}
+.now .name{font-size:1.1rem;font-weight:700;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.now .detail{color:var(--muted);font-size:.88rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+svg.diagram{display:block;width:100%;height:auto;font-family:var(--font-body)}
+svg .frame{fill:var(--frame);stroke:var(--line);stroke-dasharray:5 4}
+svg .ftitle{font-family:var(--font-mono);font-size:14px;letter-spacing:.06em;font-weight:600}
+svg .node rect,svg .node polygon{stroke-width:1.6;transition:fill .15s,stroke-width .15s}
+svg .node text{font-size:16px;fill:var(--ink);text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+svg .g-main rect{fill:var(--main-soft);stroke:var(--main)} svg .g-nav rect{fill:var(--nav-soft);stroke:var(--nav)}
+svg .g-del rect{fill:var(--decide-soft);stroke:var(--decide)} svg .g-err rect{fill:var(--err-soft);stroke:var(--err)}
+svg .g-q polygon{fill:var(--decide-soft);stroke:var(--decide)}
+svg .g-new rect{stroke-dasharray:6 3}
+svg .node.active rect,svg .node.active polygon{stroke-width:4}
+svg .g-main.active rect{fill:var(--main)} svg .g-nav.active rect{fill:var(--nav)} svg .g-del.active rect{fill:var(--decide)} svg .g-err.active rect{fill:var(--err)}
+svg .g-q.active polygon{fill:var(--decide)}
+svg .node.active text{fill:var(--surface);font-weight:700}
+svg .edge path{fill:none;stroke:var(--muted);stroke-width:1.4;opacity:.65}
+svg .edge text{font-size:13px;fill:var(--muted)}
+svg .edge.taken path{stroke:var(--accent);stroke-width:3.4;opacity:1}
+svg .edge.taken text{fill:var(--accent);font-weight:700}
+.under{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+@media (max-width:1100px){.under{grid-template-columns:minmax(0,1fr)}}
+.note{font-size:.84rem;color:var(--muted);margin:6px 0 8px;max-width:62ch}
+.memstats{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;font-size:.86rem;color:var(--muted)}
+.memstats b{color:var(--ink);font-family:var(--font-mono);font-size:1.05rem}
+.learn{width:100%;border-collapse:collapse;font-size:.84rem;font-variant-numeric:tabular-nums;margin-top:8px}
+.learn th{font-family:var(--font-mono);font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;font-weight:600;padding:5px 6px;border-bottom:1px solid var(--line)}
+.learn td{padding:6px;border-bottom:1px solid var(--line)}
+.learn .num{text-align:right}
+.learn td i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.learn .unknown{color:var(--muted);font-style:italic}
+.learn .best{color:var(--nav);font-weight:700}
+.log{font-family:var(--font-mono);font-size:.74rem;max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;margin-top:8px}
+.log div{display:grid;grid-template-columns:40px minmax(0,1fr);gap:6px}
+.log time{color:var(--muted);font-variant-numeric:tabular-nums}
+.log .q{color:var(--decide);font-weight:600} .log .e{color:var(--err);font-weight:600} .log .u{color:var(--accent);font-weight:600} .log .f{color:var(--nav);font-weight:700}
+#err3d{display:none;padding:20px;color:#15222a}
+@media (prefers-reduced-motion: reduce){svg .node rect,svg .node polygon{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>MediBot Specimen Runner · 3D twin <small>Group 3 state flow diagram, running live</small></h1>
+    <div class="controls">
+      <button id="btnPlay" aria-label="Pause simulation">Pause</button>
+      <label class="inline" for="speed">Speed
+        <select id="speed"><option value="0.45">Slow</option><option value="1" selected>Normal</option></select></label>
+    </div>
+  </header>
+
+  <div class="main">
+    <section class="card">
+      <div class="mind" id="mind"><svg viewBox="0 0 40 40" aria-hidden="true"><line x1="20" y1="3" x2="20" y2="9" stroke="#15222a" stroke-width="2"/><circle cx="20" cy="3.5" r="2.5" fill="#0b7480"/><rect x="6" y="9" width="28" height="22" rx="6" fill="#e9eef1" stroke="#15222a" stroke-width="2"/><rect x="10" y="13" width="20" height="11" rx="4" fill="#15222a"/><circle cx="15.5" cy="18.5" r="2.4" fill="#5fe0ea"/><circle cx="24.5" cy="18.5" r="2.4" fill="#5fe0ea"/><rect x="14" y="27" width="12" height="2" rx="1" fill="#15222a"/><rect x="2" y="16" width="4" height="8" rx="2" fill="#15222a"/><rect x="34" y="16" width="4" height="8" rx="2" fill="#15222a"/><rect x="11" y="32" width="18" height="5" rx="2" fill="#0b7480"/></svg><div class="txt" id="mindTxt" aria-live="polite"></div></div>
+      <div id="view">
+        <div id="err3d">The 3D view could not start in this browser (WebGL is unavailable). The diagram and log still run.</div>
+        <div class="batt" aria-label="Battery"><span class="lbl">Battery</span><span class="bar"><span class="fill" id="batFill"></span></span><span id="batTxt">100%</span></div>
+        <div class="camrow"><button id="camOver" class="on">Overview</button><button id="camFollow">Follow robot</button></div>
+        <div class="hint" id="hint">Drag to rotate, pinch or scroll to zoom. Dark areas are parts the robot has not seen yet.</div>
+      </div>
+      <div class="controlsrow">
+        <div class="row" id="boxBtns"><span class="eyebrow">Add box</span></div>
+        <div class="row"><span class="eyebrow">Edit</span><button data-tool="wall">Add wall</button><button data-tool="erase">Erase</button></div>
+      </div>
+    </section>
+    <section class="card">
+      <div class="now" id="now">
+        <span class="name" id="nowName">Power On / Initialize</span>
+        <span class="detail" id="nowDetail"></span>
+      </div>
+      <svg class="diagram" id="diagram" viewBox="0 0 1000 612" role="img" aria-label="MediBot state flow diagram with the current state highlighted"></svg>
+      <div class="row" style="margin-top:10px">
+        <span class="eyebrow">Test the error branches</span>
+        <button id="evFail">Handoff fails</button>
+        <button id="evFault">Sensor fault</button>
+        <button id="evEmergency" class="danger">Emergency stop</button>
+        <button id="evHelp">Staff assists</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="under">
+    <section class="card">
+      <p class="eyebrow">What the robot has learned</p>
+      <p class="note">It starts knowing only the Charging Bay. Each box color belongs to a department, but the robot has to find where that department is. Everything it sees goes onto its own map, and later trips use that map to take the shortest known route.</p>
+      <div class="memstats">
+        <span>Map explored <b id="explored">0%</b></span>
+        <span>Boxes waiting <b id="rackCount">0</b></span>
+        <button id="btnForget">Forget map (start over)</button>
+      </div>
+      <table class="learn"><thead><tr><th>Department</th><th class="num">Found on trip</th><th class="num">First trip</th><th class="num">Best</th><th class="num">Last trip</th></tr></thead><tbody id="learnRows"></tbody></table>
+    </section>
+    <section class="card">
+      <p class="eyebrow">Decision log</p>
+      <div class="log" id="log" aria-live="polite"></div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+
+// ======================= World (the real hospital) =======================
+const COLS = 28, ROWS = 17;
+const key = (x, y) => y * COLS + x;
+const inBounds = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
+// Each box color belongs to one department. The robot knows the color rule, not where the rooms are.
+const DEPTS = {
+  lab:  { name: "Lab",       color: "Green",  hex: 0x2f9e5b, css: "--box-lab",  cell: [4, 2],   label: [1, 1] },
+  rad:  { name: "Radiology", color: "Blue",   hex: 0x3466cf, css: "--box-rad",  cell: [12, 2],  label: [9, 1] },
+  ward: { name: "Ward",      color: "Yellow", hex: 0xd9a514, css: "--box-ward", cell: [23, 11], label: [20, 9] },
+  er:   { name: "Emergency", color: "Red",    hex: 0xd64541, css: "--box-er",   cell: [23, 2],  label: [17, 1] },
+};
+const HOME = { name: "Charging Bay", cell: [3, 13] };
+const PICKUP = [1, 10];   // the floor cell in front of the first rack slot
+
+let grid, userWalls = new Set();
+function buildMap() {
+  grid = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
+  const carve = (x0, y0, x1, y1) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) grid[y][x] = 0; };
+  carve(1, 1, 7, 4);    // Lab
+  carve(9, 1, 15, 4);   // Radiology
+  carve(17, 1, 26, 4);  // Emergency (farthest from the Charging Bay)
+  carve(1, 6, 26, 7);   // main corridor
+  carve(3, 5, 4, 5); carve(12, 5, 12, 5); carve(24, 5, 25, 5);   // doors to the main corridor
+  carve(8, 2, 8, 2);    // Lab has a second door into Radiology (a shortcut to discover)
+  carve(7, 8, 8, 15);   // west cross-corridor
+  carve(17, 8, 18, 15); // east cross-corridor
+  carve(7, 15, 26, 15); // service corridor (makes loops with the two cross-corridors)
+  carve(1, 10, 5, 15); carve(6, 12, 6, 13);   // Charging Bay and its door
+  carve(9, 11, 14, 12); // storage hallway: a dead end
+  carve(20, 9, 26, 13); carve(19, 11, 19, 11); carve(23, 14, 23, 14);  // Ward, with two doors
+  for (const k of userWalls) grid[Math.floor(k / COLS)][k % COLS] = 1;
+}
+const isWall = (x, y) => !inBounds(x, y) || grid[y][x] === 1;
+const deptCells = new Set(Object.values(DEPTS).map(d => key(...d.cell)));
+const staffCell = d => [d.cell[0] + 1, d.cell[1]];
+const staffCells = new Set(Object.values(DEPTS).map(d => key(...staffCell(d))));
+const protectedCells = new Set([HOME.cell, ...Object.values(DEPTS).flatMap(d => [d.cell, staffCell(d)])].map(c => key(...c)));
+
+// ======================= The robot's own map (what it has learned) =======================
+// -1 = not seen yet, 0 = floor, 1 = wall
+const UNKNOWN = -1;
+const rmap = new Int8Array(COLS * ROWS).fill(UNKNOWN);
+const found = {};   // dept -> true once the robot has seen that department's handoff point
+function resetRobotMap() {
+  rmap.fill(UNKNOWN);
+  for (const k in found) delete found[k];
+  // On day one the robot only knows its home: the Charging Bay
+  for (let y = 9; y <= 16; y++) for (let x = 0; x <= 6; x++) rmap[key(x, y)] = isWall(x, y) ? 1 : 0;
+}
+
+// ======================= Simulation state =======================
+const sim = {
+  t: 0, running: true, speed: 1, failNext: false,
+  people: [], rack: [], boxId: 1, tripNo: 0, peopleT: 0,
+  delivered: Object.fromEntries(Object.keys(DEPTS).map(k => [k, 0])),
+  stats: Object.fromEntries(Object.keys(DEPTS).map(k => [k, { found: null, first: null, best: null, last: null }])),
+  m: { dist: 0 },
+};
+const R = {
+  x: HOME.cell[0], y: HOME.cell[1], battery: 100, state: "INIT", timer: 0, phase: null, shownPhase: null, phaseT: 0, path: [],
+  nav: null, carry: null, people: new Map(), waitCount: 0, retries: 0,
+  arm: 0, lid: 0, orient: null, decision: null, helpReason: null, resolveKind: null, lastDecision: "", dir: 0,
+};
+const STATE_NAMES = {
+  INIT: "Power On / Initialize", STANDBY: "Standby", RECEIVE: "Receive Specimen", IDENTIFY: "Identify Destination",
+  SEARCH: "Search for Destination", PLAN: "Plan Route", NAV: "Navigation (OODA loop)", AVOID: "Avoid Obstacle",
+  DELIVER: "Deliver Specimen", CONFIRM: "Confirm Delivery", RETRY: "Retry Delivery", NOTIFY: "Notify Staff",
+  RETURN: "Return to Standby", LOW_BATTERY: "Low Battery", SYSTEM_ERROR: "System Error", EMERGENCY: "Emergency Stop",
+  RESOLVE: "Resolve Issue", HELP: "Request Human Assistance",
+};
+const GROUP = s => ["INIT", "STANDBY", "RECEIVE", "IDENTIFY", "PLAN"].includes(s) ? "main"
+  : ["NAV", "AVOID", "SEARCH"].includes(s) ? "nav" : ["DELIVER", "CONFIRM", "RETRY", "RETURN"].includes(s) ? "decide" : "err";
+const ERROR_STATES = new Set(["LOW_BATTERY", "SYSTEM_ERROR", "EMERGENCY", "RESOLVE", "HELP"]);
+
+// ======================= Log =======================
+const logEl = $("log");
+function log(text, cls = "") {
+  const m = Math.floor(sim.t / 60), s = Math.floor(sim.t % 60);
+  const row = document.createElement("div");
+  const time = document.createElement("time"); time.textContent = `${m}:${String(s).padStart(2, "0")}`;
+  const span = document.createElement("span"); span.className = cls; span.textContent = text;
+  row.append(time, span); logEl.prepend(row);
+  while (logEl.children.length > 80) logEl.lastChild.remove();
+}
+
+// ======================= Robot's mind (message box) =======================
+// Events can put a message up for a few seconds; otherwise the box describes the current state.
+function say(text, mood = "", secs = 2.5) { R.say = { text, mood, until: sim.t + secs }; }
+function thought() {
+  if (R.say && sim.t < R.say.until) return R.say;
+  const d = R.carry ? DEPTS[R.carry.dept] : null, pct = exploredPct();
+  switch (R.state) {
+    case "INIT": return { text: "Booting up. I only know my charging bay." };
+    case "STANDBY": return { text: sim.rack.length ? "A box is waiting. Going to get it." : "All done. Waiting for a new box." };
+    case "RECEIVE": return { text: R.carry ? `Got the ${d.color.toLowerCase()} box!` : "Going to the box rack." };
+    case "IDENTIFY": return { text: `${d.color} means ${d.name}. Do I know where that is?` };
+    case "SEARCH": return { text: `Where is ${d.name}? Exploring… (${pct}% mapped)` };
+    case "PLAN": return { text: `Planning the shortest route to ${R.nav.label}.` };
+    case "NAV":
+      if (R.nav.purpose === "explore") return { text: `Searching for ${d ? d.name : "the room"}… (${pct}% mapped)` };
+      if (R.nav.purpose === "deliver") return { text: `Taking the box to ${R.nav.label}. ${R.path.length} steps to go.` };
+      if (R.nav.purpose === "charge") return { text: "Battery low. Heading to the charger." };
+      return { text: "Heading back to the charging bay." };
+    case "AVOID": return { text: R.nav.purpose === "explore" ? "Can't go that way. I'll look somewhere else." : "Blocked! Finding another way.", mood: "alert" };
+    case "DELIVER": return { text: `Dropping off the box at ${d.name}.` };
+    case "CONFIRM": return { text: "Handoff confirmed.", mood: "happy" };
+    case "RETRY": return { text: "Nobody's here to take it. I'll try again.", mood: "alert" };
+    case "NOTIFY": return { text: "Still nobody. Alerting staff and taking it back.", mood: "alert" };
+    case "RETURN": return { text: "Job done. Back to the charging bay." };
+    case "LOW_BATTERY": return { text: "Battery low! I need to charge.", mood: "alert" };
+    case "SYSTEM_ERROR": return { text: "Sensor error. Trying to reset…", mood: "alert" };
+    case "EMERGENCY": return { text: "Emergency stop! Waiting for staff.", mood: "alert" };
+    case "RESOLVE": return { text: R.resolveKind === "charge" ? `Charging… ${Math.round(R.battery)}%` : "Problem solved. Back to work." };
+    case "HELP": return { text: R.helpReason === "route" ? "I can't get there. I need help!" : "I need a person to fix me.", mood: "alert" };
+  }
+  return { text: "" };
+}
+
+// ======================= State flow diagram (SVG) =======================
+const NODES = [
+  { id: "INIT", x: 20, y: 20, w: 115, h: 46, label: ["Power On /", "Initialize"], g: "main" },
+  { id: "STANDBY", x: 20, y: 100, w: 115, h: 46, label: ["Standby", "at charger"], g: "main" },
+  { id: "RECEIVE", x: 150, y: 100, w: 115, h: 46, label: ["Receive", "Specimen"], g: "main" },
+  { id: "IDENTIFY", x: 280, y: 100, w: 115, h: 46, label: ["Identify", "Destination"], g: "main" },
+  { id: "Q_KNOWN", cx: 460, cy: 123, hw: 50, hh: 32, label: ["Location", "known?"], g: "q" },
+  { id: "PLAN", x: 530, y: 100, w: 95, h: 46, label: ["Plan Route", "(A*)"], g: "main" },
+  { id: "SEARCH", x: 455, y: 190, w: 120, h: 46, label: ["Search for", "Destination"], g: "nav", extra: "new" },
+  { id: "observe", x: 650, y: 46, w: 72, h: 50, label: ["Observe"], g: "nav" },
+  { id: "orient", x: 735, y: 46, w: 72, h: 50, label: ["Orient"], g: "nav" },
+  { id: "decide", x: 820, y: 46, w: 72, h: 50, label: ["Decide"], g: "nav" },
+  { id: "act", x: 905, y: 46, w: 72, h: 50, label: ["Act"], g: "nav" },
+  { id: "Q_OBST", cx: 700, cy: 225, label: ["Obstacle", "detected?"], g: "q" },
+  { id: "Q_ARR", cx: 880, cy: 225, label: ["Arrived at", "destination?"], g: "q" },
+  { id: "AVOID", x: 635, y: 300, w: 130, h: 46, label: ["Avoid Obstacle", "(replan route)"], g: "nav" },
+  { id: "DELIVER", x: 815, y: 300, w: 130, h: 46, label: ["Deliver", "Specimen"], g: "del" },
+  { id: "Q_SUCC", cx: 880, cy: 400, label: ["Delivery", "successful?"], g: "q" },
+  { id: "RETRY", x: 635, y: 377, w: 130, h: 46, label: ["Retry", "Delivery"], g: "del" },
+  { id: "NOTIFY", x: 635, y: 455, w: 130, h: 46, label: ["Notify Staff"], g: "err" },
+  { id: "CONFIRM", x: 815, y: 475, w: 130, h: 46, label: ["Confirm", "Delivery"], g: "del" },
+  { id: "RETURN", x: 635, y: 555, w: 155, h: 46, label: ["Return to", "Standby"], g: "del" },
+  { id: "LOW_BATTERY", x: 40, y: 232, w: 150, h: 46, label: ["Low Battery", "go to charger"], g: "err" },
+  { id: "SYSTEM_ERROR", x: 40, y: 302, w: 150, h: 46, label: ["System Error", "try self-reset"], g: "err" },
+  { id: "EMERGENCY", x: 40, y: 372, w: 150, h: 46, label: ["Emergency Stop", "notify staff"], g: "err" },
+  { id: "RESOLVE", x: 270, y: 302, w: 150, h: 46, label: ["Resolve Issue", "recharge / reset"], g: "err" },
+  { id: "HELP", x: 460, y: 377, w: 150, h: 46, label: ["Request Human", "Assistance"], g: "err" },
+];
+const EDGES = [
+  { id: "e-init", pts: [[77, 66], [77, 100]], from: "INIT", to: "STANDBY" },
+  { id: "e-req", pts: [[135, 123], [150, 123]], from: "STANDBY", to: "RECEIVE" },
+  { id: "e-rec", pts: [[265, 123], [280, 123]], from: "RECEIVE", to: "IDENTIFY" },
+  { id: "e-idf", pts: [[395, 123], [410, 123]] },
+  { id: "known-yes", pts: [[510, 123], [530, 123]], from: "IDENTIFY", to: "PLAN", label: "Yes", lx: 520, ly: 113 },
+  { id: "known-no", pts: [[460, 155], [460, 165], [515, 165], [515, 190]], from: "IDENTIFY", to: "SEARCH", label: "No", lx: 444, ly: 170 },
+  { id: "found", pts: [[575, 213], [605, 213], [605, 146]], from: "NAV", to: "PLAN", label: "found it", lx: 616, ly: 180, rot: -90 },
+  { id: "e-plan", pts: [[625, 123], [640, 123]], from: "PLAN", to: "NAV" },
+  { id: "e-o1", pts: [[722, 71], [735, 71]] },
+  { id: "e-o2", pts: [[807, 71], [820, 71]] },
+  { id: "e-o3", pts: [[892, 71], [905, 71]] },
+  { id: "e-loop", pts: [[941, 96], [941, 124], [686, 124], [686, 96]], label: "repeat while navigating", lx: 813, ly: 140 },
+  { id: "e-toq", pts: [[700, 160], [700, 190]] },
+  { id: "obst-yes", pts: [[700, 260], [700, 300]], from: "NAV", to: "AVOID", label: "Yes", lx: 716, ly: 284 },
+  { id: "obst-no", pts: [[765, 225], [815, 225]], label: "No", lx: 790, ly: 215 },
+  { id: "arr-yes", pts: [[880, 260], [880, 300]], from: "NAV", to: "DELIVER", label: "Yes", lx: 896, ly: 284 },
+  { id: "arr-no", pts: [[945, 225], [975, 225], [975, 160]], label: "No", lx: 958, ly: 215 },
+  { id: "avoid-back", pts: [[635, 323], [622, 323], [622, 150], [640, 150]], from: "AVOID", to: "NAV" },
+  { id: "avoid-help", pts: [[650, 346], [650, 362], [535, 362], [535, 377]], from: "AVOID", to: "HELP", label: "unable to resolve", lx: 590, ly: 356 },
+  { id: "e-del", pts: [[880, 346], [880, 365]] },
+  { id: "succ-yes", pts: [[880, 435], [880, 475]], from: "DELIVER", to: "CONFIRM", label: "Yes", lx: 896, ly: 458 },
+  { id: "succ-no", pts: [[815, 400], [765, 400]], from: "DELIVER", to: "RETRY", label: "No", lx: 792, ly: 415 },
+  { id: "retry-back", pts: [[765, 386], [790, 386], [790, 323], [815, 323]], from: "RETRY", to: "DELIVER" },
+  { id: "retry-notify", pts: [[700, 423], [700, 455]], from: "DELIVER", to: "NOTIFY", label: "still unsuccessful", lx: 760, ly: 442 },
+  { id: "notify-ret", pts: [[700, 501], [700, 555]], from: "NOTIFY", to: "RETURN" },
+  { id: "conf-ret", pts: [[880, 521], [880, 578], [790, 578]], from: "CONFIRM", to: "RETURN" },
+  { id: "ret-stand", pts: [[635, 578], [10, 578], [10, 123], [20, 123]], from: "NAV", to: "STANDBY", label: "back at charger, await next box", lx: 320, ly: 570 },
+  { id: "stand-bat", pts: [[77, 146], [77, 232]], from: "STANDBY", to: "LOW_BATTERY", label: "battery low", lx: 117, ly: 175 },
+  { id: "bat-res", pts: [[190, 255], [230, 255], [230, 325], [270, 325]], from: "NAV", to: "RESOLVE" },
+  { id: "err-res", pts: [[190, 325], [270, 325]], from: "SYSTEM_ERROR", to: "RESOLVE" },
+  { id: "emg-res", pts: [[190, 395], [230, 395], [230, 325]], from: "EMERGENCY", to: "RESOLVE" },
+  { id: "res-plan", pts: [[345, 302], [345, 180], [545, 180], [545, 146]], from: "RESOLVE", to: "PLAN", label: "issue resolved", lx: 333, ly: 245, rot: -90 },
+  { id: "err-help", pts: [[420, 318], [440, 318], [440, 392], [460, 392]], from: "SYSTEM_ERROR", to: "HELP", label: "unable", lx: 452, ly: 312 },
+  { id: "help-res", pts: [[460, 410], [400, 410], [400, 348]], from: "HELP", to: "RESOLVE", label: "staff assists", lx: 432, ly: 426 },
+];
+const SVGNS = "http://www.w3.org/2000/svg";
+const svg = $("diagram"), nodeEls = {}, edgeEls = {};
+function el(tag, attrs, parent) { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; }
+function buildDiagram() {
+  const defs = el("defs", {}, svg);
+  for (const [id, color] of [["arr", "var(--muted)"], ["arrOn", "var(--accent)"]]) {
+    const m = el("marker", { id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M0,0 L10,5 L0,10 z", style: `fill:${color}` }, m);
+  }
+  el("rect", { class: "frame", x: 640, y: 10, width: 350, height: 150, rx: 8 }, svg);
+  el("text", { class: "ftitle", x: 652, y: 32, style: "fill:var(--nav)" }, svg).textContent = "NAVIGATION · OODA LOOP";
+  el("rect", { class: "frame", x: 25, y: 190, width: 420, height: 245, rx: 8 }, svg);
+  el("text", { class: "ftitle", x: 37, y: 212, style: "fill:var(--err)" }, svg).textContent = "ERROR HANDLING / EMERGENCY";
+  el("text", { x: 37, y: 432, style: "font-size:11px;fill:var(--muted)" }, svg).textContent = "faults and emergencies can interrupt any state";
+  el("text", { x: 515, y: 252, style: "font-size:11px;fill:var(--muted);text-anchor:middle" }, svg).textContent = "explores with the OODA loop";
+  for (const e of EDGES) {
+    const g = el("g", { class: "edge" }, svg);
+    const path = el("path", { d: e.pts.map((p, i) => (i ? "L" : "M") + p[0] + "," + p[1]).join(" "), "marker-end": "url(#arr)" }, g);
+    if (e.label) {
+      const t = el("text", { x: e.lx, y: e.ly, "text-anchor": "middle" }, g); t.textContent = e.label;
+      if (e.rot) t.setAttribute("transform", `rotate(${e.rot} ${e.lx} ${e.ly})`);
+    }
+    edgeEls[e.id] = { g, path };
+  }
+  for (const n of NODES) {
+    const g = el("g", { class: `node g-${n.g}${n.extra ? " g-" + n.extra : ""}` }, svg);
+    let cx, cy;
+    if (n.cx) {
+      cx = n.cx; cy = n.cy; const hw = n.hw || 65, hh = n.hh || 35;
+      el("polygon", { points: `${cx},${cy - hh} ${cx + hw},${cy} ${cx},${cy + hh} ${cx - hw},${cy}` }, g);
+    } else {
+      cx = n.x + n.w / 2; cy = n.y + n.h / 2;
+      el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: 7 }, g);
+    }
+    n.label.forEach((line, i) => {
+      const t = el("text", { x: cx, y: cy + (i - (n.label.length - 1) / 2) * 17 }, g); t.textContent = line;
+      if (n.cx) t.style.fontSize = n.hw ? "13px" : "14px";
+      else if (i > 0 && /^[a-z(]/.test(line)) t.style.fontSize = "13px";
+    });
+    nodeEls[n.id] = g;
+  }
+}
+// Highlights are timed in simulation seconds, so a paused simulation keeps them visible
+const flashNode = new Map(), flashEdge = new Map();
+const HOLD = 1.1;
+function flashQ(id, edgeId) { flashNode.set(id, sim.t + HOLD); if (edgeId) flashEdge.set(edgeId, sim.t + HOLD); }
+const edgeFor = (from, to) => EDGES.find(e => e.from === from && e.to === to);
+function renderDiagram() {
+  const active = R.state === "NAV" ? (R.shownPhase || "observe") : R.state;
+  for (const n of NODES) nodeEls[n.id].classList.toggle("active", n.id === active || (flashNode.get(n.id) || 0) > sim.t);
+  for (const e of EDGES) {
+    const on = (flashEdge.get(e.id) || 0) > sim.t;
+    edgeEls[e.id].g.classList.toggle("taken", on);
+    edgeEls[e.id].path.setAttribute("marker-end", on ? "url(#arrOn)" : "url(#arr)");
+  }
+}
+
+// ======================= State machine helpers =======================
+let detail = "";
+function setState(s, note) {
+  const e = edgeFor(R.state, s);
+  if (e) flashEdge.set(e.id, sim.t + HOLD);
+  R.state = s; R.timer = 0; R.phase = null; R.shownPhase = null; R.phaseT = 0;
+  log(`→ ${STATE_NAMES[s]}${note ? " · " + note : ""}`, ERROR_STATES.has(s) ? "e" : "");
+}
+function startNav(target, purpose, label) { R.nav = { cell: target, purpose, label }; setState("PLAN", `to ${label}`); }
+// After an interruption: keep delivering if a box is on board, otherwise go home
+function resumeMission() {
+  if (R.carry) {
+    const d = DEPTS[R.carry.dept];
+    if (found[R.carry.dept]) startNav(d.cell, "deliver", d.name); else setState("SEARCH", `still looking for ${d.name}`);
+  } else setState("RETURN");
+}
+function interrupt(state, note) { if (R.state === "EMERGENCY" && state !== "EMERGENCY") return; setState(state, note); }
+
+// ======================= Observe: sensing =======================
+const SENSOR_R = 4.5;
+function lineOfSight(x0, y0, x1, y1) {
+  let dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy;
+  while (!(x0 === x1 && y0 === y1)) {
+    const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; }
+    if (x0 === x1 && y0 === y1) return true;
+    if (isWall(x0, y0)) return false;
+  }
+  return true;
+}
+const personAt = (x, y) => sim.people.some(p => p.x === x && p.y === y);
+// LiDAR: every visible cell goes onto the robot's map. People are only remembered for a few seconds.
+function sense() {
+  const r = Math.ceil(SENSOR_R);
+  for (let y = R.y - r; y <= R.y + r; y++) for (let x = R.x - r; x <= R.x + r; x++) {
+    if (!inBounds(x, y) || Math.hypot(x - R.x, y - R.y) > SENSOR_R || !lineOfSight(R.x, R.y, x, y)) continue;
+    const k = key(x, y);
+    // Walls, and staff standing at their post, are obstacles on the map
+    if (isWall(x, y) || staffCells.has(k)) { rmap[k] = 1; continue; }
+    rmap[k] = 0;
+    if (personAt(x, y)) R.people.set(k, sim.t); else R.people.delete(k);
+    if (deptCells.has(k)) {
+      const dk = Object.keys(DEPTS).find(d => key(...DEPTS[d].cell) === k);
+      if (!found[dk]) {
+        found[dk] = true; sim.stats[dk].found = Math.max(1, sim.tripNo);
+        log(`Found the ${DEPTS[dk].name} sign at (${x}, ${y}). Added to the map`, "f");
+        say(R.carry && R.carry.dept === dk ? `Found ${DEPTS[dk].name}! Now I know where it is.` : `I spotted ${DEPTS[dk].name}. I'll remember that.`, "happy", 3);
+        renderLearn();
+      }
+    }
+  }
+  for (const [k, t] of R.people) if (sim.t - t > 4) R.people.delete(k);
+}
+
+// ======================= Plan Route: A* on the robot's own map =======================
+// Known floor costs 1. Cells it has not seen yet cost 3: it prefers routes it is sure about,
+// but can still try an unseen shortcut (exploration vs exploitation).
+const UNSEEN_COST = 3;
+function astar(sx, sy, gx, gy) {
+  const start = key(sx, sy), goal = key(gx, gy);
+  const h = k => Math.abs((k % COLS) - gx) + Math.abs(Math.floor(k / COLS) - gy);
+  const g = new Map([[start, 0]]), f = new Map([[start, h(start)]]), came = new Map(), closed = new Set(), open = [start];
+  while (open.length) {
+    let bi = 0; for (let i = 1; i < open.length; i++) if (f.get(open[i]) < f.get(open[bi])) bi = i;
+    const cur = open.splice(bi, 1)[0];
+    if (cur === goal) { const path = []; let c = cur; while (c !== start) { path.push([c % COLS, Math.floor(c / COLS)]); c = came.get(c); } return path.reverse(); }
+    closed.add(cur);
+    const cx = cur % COLS, cy = Math.floor(cur / COLS);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = cx + dx, ny = cy + dy, nk = key(nx, ny);
+      if (!inBounds(nx, ny) || closed.has(nk) || rmap[nk] === 1 || (R.people.has(nk) && nk !== goal)) continue;
+      const ng = g.get(cur) + (rmap[nk] === UNKNOWN ? UNSEEN_COST : 1);
+      if (ng < (g.get(nk) ?? Infinity)) { came.set(nk, cur); g.set(nk, ng); f.set(nk, ng + h(nk)); if (!open.includes(nk)) open.push(nk); }
+    }
+  }
+  return null;
+}
+
+// ======================= Search: frontier exploration =======================
+// A frontier is a known floor cell next to a cell the robot has not seen. Breadth-first search
+// over known floor finds the nearest one, so the robot explores systematically instead of wandering.
+function isFrontier(x, y) {
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inBounds(x + dx, y + dy) && rmap[key(x + dx, y + dy)] === UNKNOWN) return true;
+  return false;
+}
+function nearestFrontier() {
+  const start = key(R.x, R.y), prev = new Map([[start, -1]]), q = [start];
+  while (q.length) {
+    const c = q.shift(), cx = c % COLS, cy = Math.floor(c / COLS);
+    if (c !== start && isFrontier(cx, cy)) { const path = []; let p = c; while (p !== start) { path.push([p % COLS, Math.floor(p / COLS)]); p = prev.get(p); } return path.reverse(); }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = cx + dx, ny = cy + dy, nk = key(nx, ny);
+      if (inBounds(nx, ny) && rmap[nk] === 0 && !R.people.has(nk) && !prev.has(nk)) { prev.set(nk, c); q.push(nk); }
+    }
+  }
+  return null;
+}
+function exploredPct() {
+  let total = 0, seen = 0;
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (!isWall(x, y) && !staffCells.has(key(x, y))) { total++; if (rmap[key(x, y)] === 0) seen++; }
+  return Math.round(seen / total * 100);
+}
+
+// ======================= Robot behaviour: one case per diagram state =======================
+const PHASE_DUR = 0.2;
+function update(dt) {
+  sim.t += dt; R.timer += dt;
+  updatePeople(dt);
+  R.arm += ((["DELIVER", "CONFIRM", "RETRY"].includes(R.state) || (R.state === "RECEIVE" && R.x === PICKUP[0] && R.y === PICKUP[1]) ? 1 : 0) - R.arm) * Math.min(1, dt * 5);
+  const atRack = R.state === "RECEIVE" && R.x === PICKUP[0] && R.y === PICKUP[1];
+  R.lid += (((atRack || ["DELIVER", "CONFIRM"].includes(R.state)) && R.timer > 0.4 ? 1 : 0) - R.lid) * Math.min(1, dt * 4);
+  if (R.state !== "NAV" && R.state !== "RESOLVE") R.battery = Math.max(0, R.battery - dt * 0.02);
+
+  switch (R.state) {
+    case "INIT":
+      detail = "System check. The robot only knows its home, the Charging Bay";
+      if (R.timer > 1.6) { sense(); setState("STANDBY", "all systems OK"); }
+      break;
+    case "STANDBY":
+      detail = sim.rack.length ? "A box is waiting on the rack" : "Docked at the charger. Add a box to give it a job";
+      if (R.battery < 30) { log("◆ Battery low? → Yes", "q"); setState("LOW_BATTERY"); break; }
+      if (sim.rack.length) setState("RECEIVE");
+      break;
+    case "RECEIVE":
+      // 1) drive to the rack, 2) face it, 3) reach out and lift the box onto its compartment
+      if (!R.carry) {
+        if (R.x !== PICKUP[0] || R.y !== PICKUP[1]) {
+          detail = "Driving to the box rack";
+          R.phaseT += dt;
+          if (R.phaseT > 0.25) {
+            R.phaseT = 0;
+            const p = astar(R.x, R.y, PICKUP[0], PICKUP[1]);
+            if (p && p.length && !personAt(...p[0])) { R.dir = Math.atan2(p[0][1] - R.y, p[0][0] - R.x); R.x = p[0][0]; R.y = p[0][1]; R.battery -= 0.1; }
+          }
+          R.timer = 0;
+          break;
+        }
+        R.dir = -Math.PI / 2;  // face the rack
+        detail = "Reaching for the box on the rack";
+        if (R.timer > 0.8) { R.carry = sim.rack.shift(); R.grab = 0; R.timer = 0; }
+        break;
+      }
+      R.grab = Math.min(1, R.timer / 1.2);
+      detail = `Lifting the ${DEPTS[R.carry.dept].color.toLowerCase()} box into the compartment`;
+      if (R.timer > 1.4) {
+        R.retries = 0; sim.tripNo++; R.carry.trip = sim.tripNo; R.carry.startDist = sim.m.dist;
+        setState("IDENTIFY", `${DEPTS[R.carry.dept].color} box loaded`);
+      }
+      break;
+    case "IDENTIFY": {
+      const d = DEPTS[R.carry.dept];
+      detail = `${d.color} box: it belongs to ${d.name}. Is ${d.name} on my map?`;
+      if (R.timer > 1.0) {
+        flashEdge.set("e-idf", sim.t + HOLD);
+        flashQ("Q_KNOWN");
+        if (found[R.carry.dept]) { log(`◆ Location known? → Yes (${d.name} is on the map)`, "q"); say(`Yes! I know where ${d.name} is.`, "happy"); startNav(d.cell, "deliver", d.name); }
+        else { log(`◆ Location known? → No (never seen ${d.name})`, "q"); say(`I've never seen ${d.name}. Time to explore!`, "alert", 3); setState("SEARCH"); }
+      }
+      break;
+    }
+    case "SEARCH": {
+      const d = DEPTS[R.carry.dept];
+      detail = `Looking for ${d.name}: heading to the nearest unexplored area (${exploredPct()}% of the map seen)`;
+      if (R.timer > 0.5) {
+        sense();
+        if (found[R.carry.dept]) { flashEdge.set("found", sim.t + HOLD); startNav(d.cell, "deliver", d.name); break; }
+        const p = nearestFrontier();
+        if (p) { R.path = p; R.waitCount = 0; R.nav = { cell: p[p.length - 1], purpose: "explore", label: "unexplored area" }; setState("NAV", `exploring, ${p.length} cells to the edge of the map`); }
+        else { R.helpReason = "route"; R.nav = { cell: d.cell, purpose: "deliver", label: d.name }; setState("HELP", `explored everything I can reach and ${d.name} was not found`); }
+      }
+      break;
+    }
+    case "PLAN":
+      detail = `Running A* on its own map to ${R.nav.label}`;
+      if (R.timer > 0.7) {
+        sense();
+        const p = astar(R.x, R.y, R.nav.cell[0], R.nav.cell[1]);
+        if (p) { R.path = p; R.waitCount = 0; setState("NAV", `${p.length}-cell route`); }
+        else { R.helpReason = "route"; setState("HELP", "no route on my map"); }
+      }
+      break;
+    case "NAV": navTick(dt); break;
+    case "AVOID":
+      detail = R.nav.purpose === "explore" ? "Blocked while exploring. Picking another unexplored area" : "Replanning around the blocked cells";
+      if (R.timer > 0.6) {
+        if (R.nav.purpose === "explore") { setState("SEARCH"); break; }
+        const p = astar(R.x, R.y, R.nav.cell[0], R.nav.cell[1]);
+        if (p) { R.path = p; R.waitCount = 0; setState("NAV", `new ${p.length}-cell route`); }
+        else { R.helpReason = "route"; setState("HELP", "no way around the obstacle"); }
+      }
+      break;
+    case "DELIVER": {
+      const d = DEPTS[R.carry.dept];
+      detail = `At ${d.name}. Placing the ${d.color.toLowerCase()} box for staff`;
+      if (R.timer > 1.8) {
+        const ok = !sim.failNext;
+        log(`◆ Delivery successful? → ${ok ? "Yes" : "No, nobody took the box"}`, "q");
+        flashQ("Q_SUCC");
+        if (ok) setState("CONFIRM");
+        else if (R.retries < 2) setState("RETRY", `attempt ${R.retries + 2} of 3`);
+        else { log("◆ Still unsuccessful after retries", "q"); setState("NOTIFY"); }
+      }
+      break;
+    }
+    case "CONFIRM":
+      detail = "Handoff confirmed and logged";
+      if (R.timer > 1.3) {
+        const dk = R.carry.dept, steps = sim.m.dist - R.carry.startDist, st = sim.stats[dk];
+        sim.delivered[dk]++;
+        st.first ??= steps; st.best = Math.min(st.best ?? Infinity, steps); st.last = steps;
+        log(`Trip #${R.carry.trip} to ${DEPTS[dk].name}: ${steps} steps${st.first !== steps ? ` (first trip was ${st.first})` : ""}`, "f");
+        say(st.first !== steps ? `Delivered in ${steps} steps. Last time it took ${st.first}!` : `Delivered! That took ${steps} steps.`, "happy", 3.5);
+        R.carry = null; renderLearn();
+        setState("RETURN", "delivery complete");
+      }
+      break;
+    case "RETRY":
+      detail = "Repositioning and paging the department again";
+      if (R.timer > 2.6) { R.retries++; setState("DELIVER"); }
+      break;
+    case "NOTIFY":
+      detail = "Alerting staff. Taking the box back to the rack";
+      if (R.timer > 1.6) { sim.failNext = false; setState("RETURN"); }
+      break;
+    case "RETURN":
+      detail = "Heading back to the Charging Bay";
+      if (R.timer > 0.5) startNav(HOME.cell, "home", HOME.name);
+      break;
+    case "LOW_BATTERY":
+      detail = "Battery low. Going back to the charger (it always knows the way home)";
+      if (R.timer > 0.9) startNav(HOME.cell, "charge", HOME.name);
+      break;
+    case "SYSTEM_ERROR":
+      detail = "Sensor fault. Attempting self-recovery (reset)";
+      if (R.timer > 2.2) {
+        const fixed = Math.random() < 0.6;
+        log(`◆ Issue resolved? → ${fixed ? "Yes" : "No"}`, "q");
+        if (fixed) { R.resolveKind = "reset"; setState("RESOLVE", "sensor reset"); }
+        else { R.helpReason = "fault"; setState("HELP", "unable to resolve"); }
+      }
+      break;
+    case "EMERGENCY":
+      detail = "Stopped and staff notified. Press Staff assists to give the all clear";
+      break;
+    case "RESOLVE":
+      if (R.resolveKind === "charge") {
+        detail = `Recharging: ${Math.round(R.battery)}%`;
+        R.battery = Math.min(100, R.battery + dt * 14);
+        if (R.battery >= 100) { log("◆ Issue resolved → recharged", "q"); R.resolveKind = null; resumeMission(); }
+      } else {
+        detail = "Issue resolved. Resuming the task";
+        if (R.timer > 0.9) { R.resolveKind = null; resumeMission(); }
+      }
+      break;
+    case "HELP":
+      detail = R.helpReason === "route" ? "Can't reach the destination. Erase a wall or press Staff assists" : "Fault needs a person. Press Staff assists";
+      if (R.helpReason === "route" && R.timer > 3) {
+        R.timer = 0; sense();
+        const reachable = R.nav && astar(R.x, R.y, R.nav.cell[0], R.nav.cell[1]);
+        if (reachable || (R.carry && !found[R.carry.dept] && nearestFrontier())) { log("◆ Path open again", "q"); R.resolveKind = "reset"; setState("RESOLVE", "path reopened"); }
+      }
+      break;
+  }
+}
+
+function navTick(dt) {
+  if (R.phase === null) { R.phase = "observe"; R.phaseT = 0; }
+  R.phaseT += dt;
+  if (R.phaseT < PHASE_DUR) return;
+  R.phaseT = 0;
+  const [gx, gy] = R.nav.cell;
+  const next = p => { R.shownPhase = R.phase; R.phase = p; flashEdge.set({ orient: "e-o1", decide: "e-o2", act: "e-o3", observe: "e-loop" }[p], sim.t + PHASE_DUR * 1.5); };
+  switch (R.phase) {
+    case "observe":
+      detail = "Observe: LiDAR scans and adds what it sees to the map";
+      sense();
+      if (R.battery < 18 && R.nav.purpose !== "charge") { log("◆ Battery low? → Yes", "q"); setState("LOW_BATTERY"); return; }
+      // While exploring, the moment the destination's sign comes into view it switches to a planned route
+      if (R.nav.purpose === "explore" && R.carry && found[R.carry.dept]) {
+        const d = DEPTS[R.carry.dept]; R.lastDecision = "";
+        flashEdge.set("found", sim.t + HOLD); startNav(d.cell, "deliver", d.name); return;
+      }
+      next("orient"); break;
+    case "orient": {
+      detail = "Orient: check the next cells of the route against the map";
+      const arrived = R.x === gx && R.y === gy;
+      let blocker = null;
+      for (const [x, y] of R.path.slice(0, 3)) {
+        const k = key(x, y);
+        if (rmap[k] === 1) { blocker = { x, y, kind: staffCells.has(k) ? "staff member" : "wall" }; break; }
+        if (R.people.has(k) && !(x === gx && y === gy)) { blocker = { x, y, kind: "person" }; break; }
+      }
+      R.orient = { arrived, blocker };
+      next("decide"); break;
+    }
+    case "decide": {
+      const o = R.orient;
+      const d = o.arrived ? "arrive" : o.blocker && o.blocker.kind === "person" && R.waitCount < 4 ? "wait" : o.blocker ? "avoid" : "move";
+      detail = { arrive: R.nav.purpose === "explore" ? "Decide: reached the edge of the known map" : "Decide: arrived", wait: "Decide: a person is in the way, wait for them to pass",
+        avoid: `Decide: ${o.blocker ? o.blocker.kind : "path"} ahead, choose another way`, move: "Decide: path is clear, keep going" }[d];
+      flashEdge.set("e-toq", sim.t + HOLD);
+      if (o.blocker && !o.arrived) flashQ("Q_OBST");
+      else { flashQ("Q_OBST", "obst-no"); flashQ("Q_ARR", o.arrived ? null : "arr-no"); }
+      if (d !== R.lastDecision) {
+        if (d === "avoid" || d === "wait") log(`◆ Obstacle detected? → Yes (${o.blocker.kind} ahead)`, "q");
+        if (d === "wait") say("Someone's in the way. I'll wait.", "alert", 2);
+        if (d === "avoid" && o.blocker.kind === "wall") say("A wall I didn't know about! Adding it to my map.", "alert", 2.5);
+        if (d === "avoid" && o.blocker.kind === "staff member") say("A staff member is standing there. Going around.", "alert", 2.5);
+        if (d === "arrive" && R.nav.purpose !== "explore") log(`◆ Arrived at destination? → Yes (${R.nav.label})`, "q");
+      }
+      R.lastDecision = d; R.decision = d;
+      next("act"); break;
+    }
+    case "act": {
+      const d = R.decision;
+      if (d === "arrive") {
+        R.lastDecision = ""; const purpose = R.nav.purpose;
+        if (purpose === "deliver") setState("DELIVER");
+        else if (purpose === "explore") setState("SEARCH", "new area seen, keep looking");
+        else if (purpose === "charge") { R.resolveKind = "charge"; flashEdge.set("bat-res", sim.t + HOLD); setState("RESOLVE", "docked at charger"); }
+        else {
+          if (R.carry) { sim.rack.unshift(R.carry); R.carry = null; }  // a failed delivery goes back on the rack
+          R.nav = null; R.path = []; setState("STANDBY", "back at the charger");
+        }
+        return;
+      }
+      if (d === "avoid") { setState("AVOID"); return; }
+      if (d === "wait") { R.waitCount++; detail = "Act: hold position"; next("observe"); return; }
+      const [nx, ny] = R.path[0];
+      if (isWall(nx, ny) || staffCells.has(key(nx, ny)) || personAt(nx, ny)) { detail = "Act: hold position"; next("observe"); return; }
+      R.dir = Math.atan2(ny - R.y, nx - R.x);
+      R.x = nx; R.y = ny; R.path.shift(); R.waitCount = 0;
+      R.battery = Math.max(0, R.battery - 0.3); sim.m.dist++;
+      detail = "Act: drive one cell";
+      next("observe"); break;
+    }
+  }
+}
+
+// ======================= People (they move, so they are never learned) =======================
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const inBay = (x, y) => x <= 6 && y >= 9;
+function freeCell(x, y, ignore) {
+  return !isWall(x, y) && !sim.people.some(p => p !== ignore && p.x === x && p.y === y) && !(x === R.x && y === R.y);
+}
+function updatePeople(dt) {
+  sim.peopleT += dt; if (sim.peopleT < 0.6) return; sim.peopleT = 0;
+  for (const p of sim.people) {
+    if (Math.random() < 0.3) continue;
+    if (Math.random() < 0.25 || !p.d) p.d = DIRS[Math.floor(Math.random() * 4)];
+    const nx = p.x + p.d[0], ny = p.y + p.d[1];
+    const robotNext = R.state === "NAV" && R.path[0] && R.path[0][0] === nx && R.path[0][1] === ny;
+    if (freeCell(nx, ny, p) && !robotNext && !protectedCells.has(key(nx, ny)) && !inBay(nx, ny)) { p.x = nx; p.y = ny; } else p.d = null;
+  }
+}
+function randomFloor() {
+  for (let i = 0; i < 500; i++) {
+    const x = 1 + Math.floor(Math.random() * (COLS - 2)), y = 1 + Math.floor(Math.random() * (ROWS - 2));
+    if (freeCell(x, y) && !protectedCells.has(key(x, y)) && !inBay(x, y)) return [x, y];
+  }
+  return null;
+}
+
+// ======================= 3D view =======================
+const view = $("view");
+let three = null;
+const W = (x, y) => [x - COLS / 2 + 0.5, y - ROWS / 2 + 0.5];
+let tool = null;
+function initThree() {
+  if (!window.THREE) throw new Error("three.js not loaded");
+  const T = THREE;
+  const renderer = new T.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+  view.prepend(renderer.domElement);
+  const scene = new T.Scene(); scene.background = new T.Color(0xdfe7eb);
+  const camera = new T.PerspectiveCamera(42, 1, 0.1, 300);
+  const controls = new T.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.maxPolarAngle = Math.PI * 0.46; controls.minDistance = 5; controls.maxDistance = 55;
+  scene.add(new T.HemisphereLight(0xffffff, 0x94a3ad, 0.8));
+  const sun = new T.DirectionalLight(0xffffff, 0.65); sun.position.set(10, 26, 9); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -17, right: 17, top: 12, bottom: -12, near: 1, far: 70 });
+  scene.add(sun);
+  const std = (color, extra) => new T.MeshStandardMaterial(Object.assign({ color, roughness: 0.8 }, extra || {}));
+
+  const floor = new T.Mesh(new T.PlaneGeometry(COLS, ROWS), std(0xf5f7f8)); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+  const strip = (x0, y0, x1, y1) => {
+    const m = new T.Mesh(new T.PlaneGeometry(x1 - x0 + 1, y1 - y0 + 1), std(0xd8e2e8)); m.rotation.x = -Math.PI / 2;
+    m.position.set((x0 + x1) / 2 - COLS / 2 + 0.5, 0.004, (y0 + y1) / 2 - ROWS / 2 + 0.5); m.receiveShadow = true; scene.add(m);
+  };
+  strip(1, 6, 26, 7); strip(7, 8, 8, 15); strip(17, 8, 18, 15); strip(9, 15, 16, 15); strip(19, 15, 26, 15); strip(9, 11, 14, 12);
+  const label = (text, x, y, size, color) => {
+    const c = document.createElement("canvas"); c.width = 512; c.height = 64; const g = c.getContext("2d");
+    g.fillStyle = color; g.font = "600 34px JetBrains Mono, monospace"; g.textBaseline = "middle"; g.fillText(text, 6, 34);
+    const tex = new T.CanvasTexture(c); tex.anisotropy = 4;
+    const m = new T.Mesh(new T.PlaneGeometry(size, size / 8), new T.MeshBasicMaterial({ map: tex, transparent: true }));
+    m.rotation.x = -Math.PI / 2; m.position.set(x - COLS / 2 + size / 2, 0.01, y - ROWS / 2 + size / 16); scene.add(m);
+  };
+  for (const d of Object.values(DEPTS)) label(d.name.toUpperCase(), d.label[0] + 0.15, d.label[1] + 0.1, 5, "#5b6d77");
+  label("CHARGING BAY", 1.15, 14.2, 5, "#5b6d77"); label("MAIN CORRIDOR", 9.2, 6.05, 5, "#7a8b94");
+  label("STORAGE (DEAD END)", 9.1, 11.1, 5.5, "#7a8b94"); label("SERVICE CORRIDOR", 9.2, 15.05, 5, "#7a8b94");
+
+  // department handoff pads in each box color
+  const pad = (cell, hex) => {
+    const m = new T.Mesh(new T.RingGeometry(0.32, 0.46, 4, 1, Math.PI / 4), new T.MeshBasicMaterial({ color: hex }));
+    m.rotation.x = -Math.PI / 2; const [wx, wz] = W(...cell); m.position.set(wx, 0.012, wz); scene.add(m);
+  };
+  for (const d of Object.values(DEPTS)) pad(d.cell, d.hex);
+  pad(HOME.cell, 0x258a4f);
+  const charger = new T.Mesh(new T.BoxGeometry(0.5, 0.6, 0.18), std(0x258a4f, { emissive: 0x0d3a20 }));
+  { const [wx, wz] = W(HOME.cell[0], 15); charger.position.set(wx, 0.3, wz + 0.4); scene.add(charger); }
+  // box rack along the top of the Charging Bay
+  const rackShelf = new T.Mesh(new T.BoxGeometry(4.6, 0.08, 0.6), std(0x8a99a2));
+  { const [wx, wz] = W(3, 10); rackShelf.position.set(wx, 0.42, wz - 0.18); rackShelf.castShadow = true; scene.add(rackShelf); }
+  for (const lx of [0.75, 5.25]) { const leg = new T.Mesh(new T.BoxGeometry(0.06, 0.42, 0.5), std(0x6c7a82)); const [wx, wz] = W(0, 10); leg.position.set(wx + lx, 0.21, wz - 0.18); scene.add(leg); }
+
+  const G = {
+    wall: new T.BoxGeometry(1, 0.6, 1), torso: new T.CylinderGeometry(0.17, 0.21, 0.8, 12), head: new T.SphereGeometry(0.14, 14, 10),
+    box: new T.BoxGeometry(0.34, 0.3, 0.34),
+  };
+  const M = { wall: std(0x51636d), person: std(0x8a8f99), skin: std(0xdcb08a) };
+  const boxMat = Object.fromEntries(Object.entries(DEPTS).map(([k, d]) => [k, std(d.hex, { roughness: 0.6 })]));
+
+  let wallMesh = null;
+  function rebuildWalls() {
+    if (wallMesh) scene.remove(wallMesh);
+    const cells = []; for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (grid[y][x]) cells.push([x, y]);
+    wallMesh = new T.InstancedMesh(G.wall, M.wall, cells.length); wallMesh.castShadow = true; wallMesh.receiveShadow = true;
+    const mtx = new T.Matrix4(), base = new T.Color(0xffffff), added = new T.Color(0xc98a6b);
+    cells.forEach(([x, y], i) => { const [wx, wz] = W(x, y); mtx.makeTranslation(wx, 0.3, wz); wallMesh.setMatrixAt(i, mtx); wallMesh.setColorAt(i, userWalls.has(key(x, y)) ? added : base); });
+    if (wallMesh.instanceColor) wallMesh.instanceColor.needsUpdate = true;
+    scene.add(wallMesh);
+  }
+  rebuildWalls();
+
+  function makePerson(mat) {
+    const g = new T.Group();
+    const t = new T.Mesh(G.torso, mat); t.position.y = 0.45; t.castShadow = true; g.add(t);
+    const h = new T.Mesh(G.head, M.skin); h.position.y = 0.98; h.castShadow = true; g.add(h);
+    scene.add(g); return g;
+  }
+  const staffMeshes = {};
+  for (const [k, d] of Object.entries(DEPTS)) { const s = makePerson(std(d.hex)); const [wx, wz] = W(...staffCell(d)); s.position.set(wx, 0, wz); staffMeshes[k] = s; }
+
+  // boxes: on the rack, carried, and delivered (stacked next to each handoff pad)
+  const rackBoxes = [], stackBoxes = {};
+  for (let i = 0; i < 8; i++) { const b = new T.Mesh(G.box, boxMat.lab); b.castShadow = true; b.visible = false; scene.add(b); rackBoxes.push(b); }
+  for (const k of Object.keys(DEPTS)) {
+    stackBoxes[k] = [];
+    for (let i = 0; i < 6; i++) { const b = new T.Mesh(G.box, boxMat[k]); b.castShadow = true; b.visible = false; scene.add(b); stackBoxes[k].push(b); }
+  }
+
+  // robot
+  const robot = new T.Group(); scene.add(robot);
+  const baseMat = std(0x3466cf, { roughness: 0.5 });
+  const base = new T.Mesh(new T.CylinderGeometry(0.36, 0.4, 0.32, 28), baseMat); base.position.y = 0.2; robot.add(base);
+  const shell = new T.Mesh(new T.CylinderGeometry(0.29, 0.34, 0.34, 28), std(0xf1f4f5, { roughness: 0.4 })); shell.position.y = 0.53; robot.add(shell);
+  const ringMat = new T.MeshBasicMaterial({ color: 0x3466cf });
+  const ring = new T.Mesh(new T.TorusGeometry(0.33, 0.025, 8, 32), ringMat); ring.rotation.x = Math.PI / 2; ring.position.y = 0.37; robot.add(ring);
+  const lidPivot = new T.Group(); lidPivot.position.set(-0.14, 0.71, 0); robot.add(lidPivot);
+  const lid = new T.Mesh(new T.BoxGeometry(0.3, 0.035, 0.32), std(0xb5c2c9)); lid.position.x = 0.15; lidPivot.add(lid);
+  const carried = new T.Mesh(G.box, boxMat.lab); carried.position.set(-0.02, 0.88, 0); carried.visible = false; robot.add(carried);
+  const flying = new T.Mesh(G.box, boxMat.lab); flying.castShadow = true; flying.visible = false; scene.add(flying);
+  const lidar = new T.Group(); lidar.position.set(0.17, 0.76, 0); robot.add(lidar);
+  lidar.add(new T.Mesh(new T.CylinderGeometry(0.07, 0.07, 0.08, 16), std(0x22292d)));
+  const lidarEye = new T.Mesh(new T.BoxGeometry(0.03, 0.03, 0.03), new T.MeshBasicMaterial({ color: 0xff4040 })); lidarEye.position.x = 0.07; lidar.add(lidarEye);
+  const eye = new T.Mesh(new T.BoxGeometry(0.04, 0.08, 0.2), new T.MeshBasicMaterial({ color: 0x1b2a33 })); eye.position.set(0.31, 0.55, 0); robot.add(eye);
+  const arms = [];
+  for (const side of [-1, 1]) {
+    const shoulder = new T.Group(); shoulder.position.set(0.02, 0.55, side * 0.35); robot.add(shoulder);
+    const upper = new T.Mesh(new T.BoxGeometry(0.32, 0.07, 0.07), std(0x8796a0)); upper.position.x = 0.16; shoulder.add(upper);
+    const elbow = new T.Group(); elbow.position.x = 0.32; shoulder.add(elbow);
+    const fore = new T.Mesh(new T.BoxGeometry(0.26, 0.06, 0.06), std(0x8796a0)); fore.position.x = 0.13; elbow.add(fore);
+    const hand = new T.Group(); hand.position.x = 0.27; elbow.add(hand);
+    for (const f of [-1, 1]) { const finger = new T.Mesh(new T.BoxGeometry(0.09, 0.025, 0.025), std(0x2a2f33)); finger.position.set(0.04, f * 0.03, 0); hand.add(finger); }
+    arms.push({ shoulder, elbow, side });
+  }
+  robot.traverse(o => { if (o.isMesh) o.castShadow = true; });
+
+  // overlays: fog over unseen cells, LiDAR range and sweep, path dots, goal marker, hover cell
+  const N = COLS * ROWS;
+  const fog = new T.InstancedMesh(new T.PlaneGeometry(1.0, 1.0), new T.MeshBasicMaterial({ color: 0x1d2b33, transparent: true, opacity: 0.55, depthWrite: false }), N);
+  fog.rotation.x = -Math.PI / 2; fog.position.y = 0.66; fog.renderOrder = 2; scene.add(fog);
+  const sensorRing = new T.Mesh(new T.RingGeometry(SENSOR_R - 0.05, SENSOR_R, 64), new T.MeshBasicMaterial({ color: 0x0b7480, transparent: true, opacity: 0.5 }));
+  sensorRing.rotation.x = -Math.PI / 2; sensorRing.position.y = 0.02; scene.add(sensorRing);
+  const sweep = new T.Mesh(new T.CircleGeometry(SENSOR_R, 20, 0, 0.6), new T.MeshBasicMaterial({ color: 0x0b7480, transparent: true, opacity: 0.16, depthWrite: false }));
+  sweep.rotation.x = -Math.PI / 2; sweep.position.y = 0.025; scene.add(sweep);
+  const dots = new T.InstancedMesh(new T.CircleGeometry(0.11, 12), new T.MeshBasicMaterial({ color: 0x0b7480 }), N);
+  dots.rotation.x = -Math.PI / 2; dots.position.y = 0.03; scene.add(dots);
+  const goal = new T.Mesh(new T.ConeGeometry(0.2, 0.45, 16), new T.MeshBasicMaterial({ color: 0x0b7480 })); goal.rotation.x = Math.PI; scene.add(goal);
+  const hover = new T.Mesh(new T.PlaneGeometry(0.98, 0.98), new T.MeshBasicMaterial({ color: 0x0b7480, transparent: true, opacity: 0.3, depthWrite: false }));
+  hover.rotation.x = -Math.PI / 2; hover.position.y = 0.02; hover.visible = false; scene.add(hover);
+
+  const tmp = new T.Matrix4();
+  const stateColor = { main: 0x3466cf, nav: 0x258a4f, decide: 0xd29b1a, err: 0xcc3d36 };
+  let rx = W(R.x, R.y)[0], rz = W(R.x, R.y)[1], rYaw = 0;
+
+  function sync(now, dt) {
+    for (const p of sim.people) {
+      if (!p.mesh) { p.mesh = makePerson(M.person); p.mesh.userData.person = p; const [wx, wz] = W(p.x, p.y); p.mesh.position.set(wx, 0, wz); }
+      const [wx, wz] = W(p.x, p.y), k = Math.min(1, dt * 6);
+      p.mesh.position.x += (wx - p.mesh.position.x) * k; p.mesh.position.z += (wz - p.mesh.position.z) * k;
+    }
+    for (const o of scene.children.filter(o => o.userData.person && !sim.people.includes(o.userData.person))) scene.remove(o);
+    for (const [k, s] of Object.entries(staffMeshes)) s.visible = !(sim.failNext && R.carry && R.carry.dept === k);
+    rackBoxes.forEach((b, i) => {
+      const box = sim.rack[i]; b.visible = !!box;
+      if (box) { b.material = boxMat[box.dept]; const [wx, wz] = W(1, 10); b.position.set(wx + 0.05 + i * 0.55, 0.61, wz - 0.18); }
+    });
+    for (const [k, list] of Object.entries(stackBoxes)) list.forEach((b, i) => {
+      b.visible = i < sim.delivered[k];
+      const [wx, wz] = W(...DEPTS[k].cell); b.position.set(wx - 0.62 + (i % 2) * 0.36, 0.15 + Math.floor(i / 2) * 0.31, wz - 0.3);
+    });
+    const grabbing = R.state === "RECEIVE" && R.carry;
+    carried.visible = !!R.carry && !grabbing; if (R.carry) carried.material = boxMat[R.carry.dept];
+    flying.visible = !!grabbing;
+    if (grabbing) {
+      // the box travels from the rack slot, through the robot's hands, onto its compartment
+      const t = R.grab, e = t * t * (3 - 2 * t), [sx, sz] = W(1, 10);
+      flying.material = boxMat[R.carry.dept];
+      flying.position.set(sx + 0.05 + (rx - sx - 0.05) * e, 0.61 + 0.27 * Math.sin(e * Math.PI) * 0.6 + (0.88 - 0.61) * e, (sz - 0.18) + (rz - sz + 0.18) * e);
+    }
+    // robot pose
+    const [tx, tz] = W(R.x, R.y), kk = Math.min(1, dt * 7);
+    rx += (tx - rx) * kk; rz += (tz - rz) * kk;
+    const yaw = -R.dir; let dy = yaw - rYaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI; rYaw += dy * Math.min(1, dt * 8);
+    robot.position.set(rx, 0, rz); robot.rotation.y = rYaw;
+    const col = stateColor[GROUP(R.state)], alarm = ["EMERGENCY", "HELP", "SYSTEM_ERROR"].includes(R.state);
+    baseMat.color.setHex(col); ringMat.color.setHex(alarm && Math.sin(now / 140) > 0 ? 0xffffff : col);
+    lidar.rotation.y += dt * (["NAV", "PLAN", "SEARCH"].includes(R.state) ? 9 : 1.5);
+    lidPivot.rotation.z = R.lid * 1.2;
+    for (const a of arms) { a.shoulder.rotation.z = -1.25 + R.arm * 1.25; a.shoulder.rotation.y = a.side * (0.25 - R.arm * 0.25); a.elbow.rotation.z = 1.4 * (1 - R.arm); }
+    let i = 0;
+    for (let k = 0; k < N; k++) if (rmap[k] === UNKNOWN) { const [wx, wz] = W(k % COLS, Math.floor(k / COLS)); tmp.makeTranslation(wx, -wz, 0); fog.setMatrixAt(i++, tmp); }
+    fog.count = i; fog.instanceMatrix.needsUpdate = true;
+    sensorRing.position.x = sweep.position.x = rx; sensorRing.position.z = sweep.position.z = rz;
+    sweep.visible = ["NAV", "PLAN", "SEARCH"].includes(R.state); sweep.rotation.z = now / 300;
+    i = 0;
+    if (["NAV", "AVOID", "PLAN"].includes(R.state)) for (const [x, y] of R.path) { const [wx, wz] = W(x, y); tmp.makeTranslation(wx, -wz, 0); dots.setMatrixAt(i++, tmp); }
+    dots.count = i; dots.instanceMatrix.needsUpdate = true;
+    goal.visible = !!(R.nav && ["NAV", "AVOID", "PLAN"].includes(R.state));
+    if (goal.visible) { const [gx, gz] = W(...R.nav.cell); goal.position.set(gx, 1.1 + Math.sin(now / 250) * 0.12, gz); goal.material.color.setHex(R.nav.purpose === "explore" ? 0x8796a0 : 0x0b7480); }
+  }
+
+  let follow = false;
+  function overview() {
+    const vf = camera.fov * Math.PI / 360, hf = Math.atan(Math.tan(vf) * camera.aspect);
+    const dist = Math.max((COLS + 4) / 2 / Math.tan(hf), (ROWS + 4) / 2 / Math.tan(vf)) * 1.02;
+    camera.position.set(0, dist * 0.9, dist * 0.44); controls.target.set(0, 0, 0.3);
+  }
+  function setCam(f) { follow = f; $("camFollow").classList.toggle("on", f); $("camOver").classList.toggle("on", !f); if (!f) overview(); }
+  $("camOver").onclick = () => setCam(false);
+  $("camFollow").onclick = () => setCam(true);
+
+  // Add wall / Erase: with a tool on, dragging paints cells; with no tool, dragging rotates the camera
+  const ray = new T.Raycaster(), ndc = new T.Vector2(), plane = new T.Plane(new T.Vector3(0, 1, 0), 0), hit = new T.Vector3();
+  function pointer(ev) {
+    const r = renderer.domElement.getBoundingClientRect();
+    ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+  }
+  function floorCell() {
+    if (!ray.ray.intersectPlane(plane, hit)) return null;
+    const x = Math.floor(hit.x + COLS / 2), y = Math.floor(hit.z + ROWS / 2);
+    return x > 0 && y > 0 && x < COLS - 1 && y < ROWS - 1 ? [x, y] : null;
+  }
+  let painting = false, lastCell = null;
+  renderer.domElement.addEventListener("pointerdown", ev => {
+    if (!tool) return;
+    pointer(ev); controls.enabled = false; painting = true; lastCell = null;
+    renderer.domElement.setPointerCapture(ev.pointerId); applyTool(floorCell());
+  }, { capture: true });
+  renderer.domElement.addEventListener("pointermove", ev => {
+    pointer(ev); const c = floorCell();
+    hover.visible = !!c && !!tool;
+    if (c) { const [wx, wz] = W(...c); hover.position.x = wx; hover.position.z = wz; }
+    if (painting) applyTool(c);
+  });
+  const release = () => { painting = false; controls.enabled = true; };
+  renderer.domElement.addEventListener("pointerup", release);
+  renderer.domElement.addEventListener("pointercancel", release);
+  renderer.domElement.addEventListener("pointerleave", () => { hover.visible = false; });
+  function applyTool(c) {
+    if (!c) return; const [x, y] = c, k = key(x, y);
+    if (k === lastCell) return; lastCell = k;
+    if (tool === "erase") {
+      sim.people = sim.people.filter(p => !(p.x === x && p.y === y));
+      if (userWalls.delete(k)) { buildMap(); rebuildWalls(); log(`You removed a wall at (${x}, ${y})`, "u"); }
+      return;
+    }
+    if (!freeCell(x, y) || protectedCells.has(k) || inBay(x, y)) return;
+    userWalls.add(k); buildMap(); rebuildWalls();
+    log(`You built a wall at (${x}, ${y})`, "u");
+  }
+
+  function resize() {
+    const w = view.clientWidth, h = view.clientHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    if (!follow) overview();
+  }
+  new ResizeObserver(resize).observe(view); resize();
+
+  return {
+    rebuildWalls,
+    render(now, dt) {
+      sync(now, dt);
+      if (follow) {
+        const want = new T.Vector3(rx, 0, rz), off = camera.position.clone().sub(controls.target);
+        controls.target.lerp(want, Math.min(1, dt * 3)); camera.position.copy(controls.target).add(off.setLength(Math.min(off.length(), 14)));
+      }
+      controls.update(); renderer.render(scene, camera);
+    },
+  };
+}
+
+// ======================= Panels =======================
+function renderPanel() {
+  $("now").style.borderLeftColor = `var(--${GROUP(R.state)})`;
+  $("nowName").textContent = R.state === "NAV" && R.shownPhase
+    ? `${R.nav && R.nav.purpose === "explore" ? "Exploring" : "Navigation"} · ${R.shownPhase[0].toUpperCase() + R.shownPhase.slice(1)}` : STATE_NAMES[R.state];
+  $("nowDetail").textContent = detail;
+  const th = thought(), mt = $("mindTxt");
+  if (mt.textContent !== th.text) mt.textContent = th.text;
+  $("mind").className = "mind" + (th.mood ? " " + th.mood : "");
+  $("batFill").style.width = R.battery + "%";
+  $("batFill").style.background = R.battery < 18 ? "#cc3d36" : R.battery < 35 ? "#d29b1a" : "#258a4f";
+  $("batTxt").textContent = Math.round(R.battery) + "%";
+  $("explored").textContent = exploredPct() + "%";
+  $("rackCount").textContent = sim.rack.length;
+  renderDiagram();
+}
+function renderLearn() {
+  const tb = $("learnRows"); tb.textContent = "";
+  for (const [k, d] of Object.entries(DEPTS)) {
+    const st = sim.stats[k], tr = document.createElement("tr");
+    const name = document.createElement("td"); const sw = document.createElement("i"); sw.style.background = `var(${d.css})`;
+    name.append(sw, `${d.name} (${d.color.toLowerCase()})`); tr.append(name);
+    const cells = found[k] ? [`#${st.found}`, st.first ?? "–", st.best ?? "–", st.last ?? "–"] : ["not found yet", "", "", ""];
+    cells.forEach((v, i) => {
+      const td = document.createElement("td");
+      td.className = "num" + (!found[k] ? " unknown" : "") + (i === 2 && st.best != null && st.best < st.first ? " best" : "");
+      td.textContent = v; tr.append(td);
+    });
+    tb.append(tr);
+  }
+}
+
+// ======================= Controls =======================
+for (const [k, d] of Object.entries(DEPTS)) {
+  const b = document.createElement("button"); b.className = "boxbtn";
+  const sw = document.createElement("i"); sw.style.background = `var(${d.css})`;
+  b.append(sw, d.name);
+  b.setAttribute("aria-label", `Add a ${d.color.toLowerCase()} box for ${d.name}`);
+  b.onclick = () => {
+    if (sim.rack.length >= 8) { log("The rack is full (8 boxes)", "u"); return; }
+    sim.rack.push({ id: sim.boxId++, dept: k }); log(`You added a ${d.color.toLowerCase()} box (${d.name})`, "u");
+  };
+  $("boxBtns").append(b);
+}
+const hints = {
+  none: "Drag to rotate, pinch or scroll to zoom. Dark areas are parts the robot has not seen yet.",
+  wall: "Tap or drag on the floor to build walls. Tap Add wall again to go back to rotating.",
+  erase: "Tap or drag to remove walls you built, or people. Tap Erase again to go back to rotating.",
+};
+document.querySelectorAll("[data-tool]").forEach(b => b.onclick = () => {
+  tool = tool === b.dataset.tool ? null : b.dataset.tool;
+  document.querySelectorAll("[data-tool]").forEach(o => o.classList.toggle("on", o.dataset.tool === tool));
+  $("hint").textContent = hints[tool || "none"];
+});
+function setRunning(r) {
+  sim.running = r; $("btnPlay").textContent = r ? "Pause" : "Play";
+  $("btnPlay").setAttribute("aria-label", r ? "Pause simulation" : "Resume simulation");
+}
+$("btnPlay").onclick = () => setRunning(!sim.running);
+$("speed").onchange = e => sim.speed = parseFloat(e.target.value);
+$("btnForget").onclick = () => {
+  resetRobotMap(); sense();
+  for (const st of Object.values(sim.stats)) Object.assign(st, { found: null, first: null, best: null, last: null });
+  sim.tripNo = 0; renderLearn(); log("You wiped the robot's map. It only knows the Charging Bay again", "u");
+};
+$("evFail").onclick = () => { sim.failNext = true; log("Staff will not be at the handoff point for the next delivery", "u"); };
+$("evFault").onclick = () => { if (!ERROR_STATES.has(R.state) && R.state !== "INIT") interrupt("SYSTEM_ERROR", "sensor fault injected"); };
+$("evEmergency").onclick = () => { if (R.state !== "EMERGENCY") interrupt("EMERGENCY", "unsafe condition, staff notified"); };
+$("evHelp").onclick = () => {
+  if (R.state === "EMERGENCY") { log("Staff: all clear", "u"); R.resolveKind = "reset"; setState("RESOLVE"); }
+  else if (R.state === "HELP") {
+    if (R.helpReason === "route") {
+      let n = 0;
+      for (const k of [...userWalls]) if (Math.hypot(k % COLS - R.x, Math.floor(k / COLS) - R.y) <= 8) { userWalls.delete(k); rmap[k] = UNKNOWN; n++; }
+      buildMap(); three && three.rebuildWalls();
+      log(`Staff removed ${n} wall cell(s) nearby`, "u");
+    } else log("Staff repaired the sensor", "u");
+    R.resolveKind = "reset"; setState("RESOLVE");
+  } else log("Staff assists: the robot does not need help right now");
+};
+
+// ======================= Boot =======================
+buildMap(); resetRobotMap(); buildDiagram(); renderLearn();
+try { three = initThree(); } catch (e) { $("err3d").style.display = "block"; console.warn(e); }
+for (let i = 0; i < 5; i++) { const c = randomFloor(); if (c) sim.people.push({ x: c[0], y: c[1] }); }
+for (const [x, y] of [[14, 7], [17, 12]]) if (freeCell(x, y)) sim.people.push({ x, y });   // two more in the corridors
+for (const dept of ["er", "lab", "ward", "er", "rad"]) sim.rack.push({ id: sim.boxId++, dept });
+log("Power on. Five boxes are waiting on the rack");
+let last = performance.now(), panelT = 0;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (sim.running) {
+    const steps = Math.ceil(sim.speed);
+    for (let i = 0; i < steps; i++) {
+      update(dt * sim.speed / steps);
+    }
+  }
+  three && three.render(now, dt);
+  panelT += dt; if (panelT > 0.05 || !sim.running) { panelT = 0; renderPanel(); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
